@@ -1,6 +1,6 @@
 # Job Hunt
 
-A full-stack job portal built from scratch with the MERN stack (MongoDB, Express, React, Node). Job seekers can browse and apply to jobs with OTP-verified accounts; recruiters can manage companies, post jobs, and review applicants.
+A full-stack job portal built from scratch with the MERN stack (MongoDB, Express, React, Node), extended with two LLM-powered features: **AI job search** and a **quick resume ATS score check**. Job seekers can browse and apply to jobs with OTP-verified accounts; recruiters can manage companies, post jobs, and review applicants.
 
 This project was built step by step as a learning exercise — every piece was typed and tested manually to understand how it works, not generated in bulk. It's set up to run on `localhost` only; no deployment config is included.
 
@@ -14,6 +14,8 @@ This project was built step by step as a learning exercise — every piece was t
 - bcryptjs for password hashing
 - Multer + Cloudinary for file uploads (profile photos, company logos)
 - Nodemailer (Gmail OAuth2) for OTP emails
+- **LLM integration** (`<PROVIDER>` SDK / API) for AI job search and ATS scoring
+- **PDF text extraction** (`<LIBRARY, e.g. pdf-parse>`) for reading uploaded resumes
 
 **Frontend**
 
@@ -35,6 +37,8 @@ This project was built step by step as a learning exercise — every piece was t
 **Job seeker (Student)**
 
 - Browse and search jobs (keyword search on title/description)
+- **AI job search** (see below)
+- **Resume ATS score check** (see below)
 - View job details
 - Apply to a job (once per job)
 - Edit profile (bio, skills, resume link)
@@ -48,9 +52,25 @@ This project was built step by step as a learning exercise — every piece was t
 - View applicants per job, with resume link
 - Accept / reject applicants
 
-**Not included**
+### AI features
 
-- AI-based job recommendations — intentionally skipped as an optional add-on. The rest of the app does not depend on it.
+**1. AI job search**
+
+Applies an LLM to job discovery. Instead of relying only on keyword matching, the user describes what they want in plain language (for example, "remote React jobs for freshers") and the LLM interprets the request and returns the most relevant jobs from the database.
+
+- Input: a natural-language query (and/or the user's profile skills)
+- Output: a ranked list of matching jobs from the existing `Job` collection
+- Falls back to the normal keyword search if the LLM call fails
+
+**2. Resume ATS score check**
+
+A quick check of how well a resume would perform against an Applicant Tracking System, powered by an LLM.
+
+- Input: the user's resume (`<PDF upload / pasted text>`), optionally with a target job description
+- Output: an ATS score out of 100, plus `<missing keywords / strengths / improvement suggestions>`
+- The score is an LLM-based estimate meant as quick feedback, not an exact replica of any real ATS
+
+> **Note:** LLM output can vary between runs and may occasionally be inaccurate. Treat scores and rankings as guidance.
 
 ## Design system
 
@@ -72,11 +92,11 @@ Fonts: **Space Grotesk** (headings) + **IBM Plex Sans** (body/UI). Job listings 
 ```
 Job-Portal/
 ├── Backend/
-│   ├── controllers/       # user, job, company, application
-│   ├── models/             # User, Job, Company, Application (Mongoose schemas)
-│   ├── routes/              # one router per resource
-│   ├── middleware/       # isAuthenticated (JWT check), multer (file upload)
-│   ├── utils/                # db connect, cloudinary, datauri, mailer
+│   ├── controllers/       # user, job, company, application, ai
+│   ├── models/            # User, Job, Company, Application (Mongoose schemas)
+│   ├── routes/            # one router per resource (incl. ai routes)
+│   ├── middleware/        # isAuthenticated (JWT check), multer (file upload)
+│   ├── utils/             # db connect, cloudinary, datauri, mailer, llm client
 │   ├── .env
 │   └── index.js
 └── Frontend/
@@ -84,23 +104,25 @@ Job-Portal/
     │   ├── components/
     │   │   ├── auth/        # Login, Register
     │   │   ├── layout/      # Navbar, Layout
-    │   │   ├── jobs/        # JobCard, EditProfileModal
-    │   │   └── admin/        # AdminNav, ProtectedRoute, Companies,
-    │   │                     # CompanyCreate, CompanySetup, PostJob,
-    │   │                     # AdminJobs, Applicants
-    │   ├── pages/             # Home, Jobs, Description, Profile,
-    │   │                     # VerifyOtp, ForgotPassword
-    │   ├── redux/            # authSlice, jobSlice, companySlice,
-    │   │                     # applicationSlice, customStorage, store
-    │   ├── hooks/             # useGetAllJobs, useGetSingleJob,
-    │   │                     # useGetAppliedJobs, useGetAllCompanies,
-    │   │                     # useGetCompanyById, useGetAllAdminJobs,
-    │   │                     # useGetApplicants
-    │   ├── utils/data.js  # API endpoint constants
-    │   ├── App.jsx           # routes
+    │   │   ├── jobs/        # JobCard, EditProfileModal, AiJobSearch
+    │   │   └── admin/       # AdminNav, ProtectedRoute, Companies,
+    │   │                    # CompanyCreate, CompanySetup, PostJob,
+    │   │                    # AdminJobs, Applicants
+    │   ├── pages/           # Home, Jobs, Description, Profile,
+    │   │                    # VerifyOtp, ForgotPassword, AtsChecker
+    │   ├── redux/           # authSlice, jobSlice, companySlice,
+    │   │                    # applicationSlice, customStorage, store
+    │   ├── hooks/           # useGetAllJobs, useGetSingleJob,
+    │   │                    # useGetAppliedJobs, useGetAllCompanies,
+    │   │                    # useGetCompanyById, useGetAllAdminJobs,
+    │   │                    # useGetApplicants
+    │   ├── utils/data.js    # API endpoint constants
+    │   ├── App.jsx          # routes
     │   └── main.jsx
     └── index.html
 ```
+
+> File names for the AI pieces (`ai` controller/routes, `llm` client, `AiJobSearch`, `AtsChecker`) are placeholders — adjust them to match your actual code.
 
 ## Environment variables (Backend `.env`)
 
@@ -119,6 +141,10 @@ EMAIL_USER=your_gmail_address@gmail.com
 CLIENT_ID=your_google_oauth_client_id
 CLIENT_SECRET=your_google_oauth_client_secret
 REFRESH_TOKEN=your_google_oauth_refresh_token
+
+# LLM (AI job search + ATS score)
+LLM_API_KEY=your_llm_provider_api_key
+LLM_MODEL=your_model_name
 ```
 
 There is no `.env` file for the frontend — the API base URLs are hardcoded in `src/utils/data.js` pointing at `http://localhost:5011`, since this project only runs locally.
@@ -158,6 +184,9 @@ A full pass to confirm everything is wired up correctly:
 5. As the Recruiter: go to **My jobs → View applicants**, see the student's application, click **Accept**.
 6. As the Student: check `/profile` → the applied job's status should now show **accepted**.
 7. Try **Forgot password** from the login page and confirm you can log in with the new password.
+8. As the Student: try the **AI job search** with a natural-language query (e.g. "react developer jobs") and confirm relevant jobs come back.
+9. As the Student: open the **ATS checker**, submit a resume, and confirm you get a score and feedback.
+10. Temporarily use an invalid `LLM_API_KEY` and confirm the app fails gracefully (AI search falls back to keyword search, ATS check shows an error toast).
 
 ## Known quirks (Windows-specific)
 
@@ -166,8 +195,9 @@ Windows' filesystem is case-insensitive, which occasionally caused import errors
 1. Rename the file in two steps (e.g. `Login.jsx` → `Login_temp.jsx` → `Login.jsx`) to force Windows to update the casing on disk.
 2. Run **TypeScript: Restart TS Server** from the VS Code command palette.
 
-## Not implemented / deliberately skipped
+## Limitations / not implemented
 
-- AI job recommendations (backend endpoint and frontend component were skipped by design)
 - Deployment configuration (this project is local-only)
 - Automated tests
+- AI results depend on the LLM provider's availability, rate limits, and API costs
+- ATS score is an LLM-based estimate, not a guarantee of how a real ATS will rate a resume

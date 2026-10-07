@@ -87,6 +87,7 @@ const Register = () => {
             className="mt-1 w-full border border-line rounded-md px-3 py-2 outline-none focus:border-signal text-ink"
           />
         </div>
+        
 
         <div>
           <label className="text-sm font-medium text-ink">Phone number</label>
